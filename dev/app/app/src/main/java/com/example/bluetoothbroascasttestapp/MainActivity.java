@@ -6,10 +6,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,6 +35,12 @@ public class MainActivity extends AppCompatActivity {
     private TextView statusTextView;
     private BroadcastReceiver timeoutMessageReceiver;
 
+    // Nome do arquivo onde as preferencias serao salvas
+    public static final String PREFS_NAME = "MonitoramentoPrefs";
+
+    // Variavel com o valor booleano true/false
+    public static final String KEY_MONITORAMENTO_ENABLED = "key_monitoramento_enabled";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -44,6 +52,47 @@ public class MainActivity extends AppCompatActivity {
 
         bluetoothTimeoutReceiver = new BluetoothTimeoutReceiver();
         checkAndRequestBluetoothPermissions();
+
+        Switch switchBluetooth = findViewById(R.id.switchBluetooth);
+
+        if (switchBluetooth == null) {
+            Log.e(TAG, "Erro: Não foi possível encontrar o Switch! Verifique o ID no XML.");
+            return;
+        }
+
+        // Inicio da logica de persistencia
+
+        // 1 - Carregar o valor salvo
+        // Obtem o arquivo de SharedPreferences
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        // Le o valor salvo
+        boolean isSwitchEnabled = prefs.getBoolean(KEY_MONITORAMENTO_ENABLED, false);
+
+        // 2 - Atualizar a UI
+        // Define o estado visual do switch com o valor salvo
+        switchBluetooth.setChecked(isSwitchEnabled);
+
+        // 3 - Salvar as mudancas de estado do switch
+        switchBluetooth.setOnCheckedChangeListener((buttonView, isChecked) -> {
+
+            if (isChecked) {
+                Log.d(TAG, "Monitoramento Inteligente: ATIVADO");
+            } else {
+                Log.d(TAG, "Monitoramento Inteligente: DESATIVADO");
+            }
+
+            // Obtem o editor para escrever no SharedPreferences
+            SharedPreferences.Editor editor = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
+
+            // Salva o novo valor de isChecked
+            editor.putBoolean(KEY_MONITORAMENTO_ENABLED, isChecked);
+
+            //Confirma a alteracao no arquivo
+            editor.apply();
+
+        // Fim da logica de persistencia
+
+        });
     }
 
     private void setupLocalTimeoutReceiver() {
@@ -125,4 +174,5 @@ public class MainActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(timeoutMessageReceiver);
         unregisterBluetoothReceiver();
     }
+
 }
