@@ -85,7 +85,9 @@
 #include "types/raw_address.h"
 // ================ SHAKKA ===========
 #include "osi/include/alarm.h"
-#include "stack/include/hcimsgs.h"
+#include "btif/include/btif_dm.h"
+#include "btif/include/btif_api.h"
+#include "stack/include/btm_api_types.h" // tBTM_CMPL_EVT_DATA
 // ====================================
 
 #ifndef PROPERTY_LINK_SUPERVISION_TIMEOUT
@@ -419,22 +421,54 @@ tACL_CONN* StackAclBtmAcl::acl_allocate_connection() {
   return nullptr;
 }
 
-// ==================== SHAKKA ===============
+// ========= SHAKKA =========================
+// callback que recebe o resultado do BTM_ReadRssi
+static void btm_acl_rssi_result_cb(void* p_data) {
+    tBTM_RSSI_RESULT* p_rssi_result = static_cast<tBTM_RSSI_RESULT*>(p_data);
+    if (p_data == nullptr) {
+        LOG_WARN("SHAKKA_LOG: Callback RSSI BTM recebeu dados nulos.");
+        return;
+    }
 
-#define RSSI_POLL_INTERVAL_MS 5000
+    if (p_rssi_result->status != HCI_SUCCESS) {
+        LOG_WARN("SHAKKA_LOG: Falha ao ler RSSI via BTM_ReadRssi. Status: %d",
+                 p_rssi_result->status);
+        return;
+    }
+
+    const RawAddress& bda = p_rssi_result->rem_bda;
+    int8_t rssi = p_rssi_result->rssi;
+
+    tACL_CONN* p_acl = btm_acl_for_bda(bda, BT_TRANSPORT_BR_EDR);
+    if (p_acl != nullptr && p_acl->in_use) {
+        p_acl->last_known_rssi = rssi;
+        LOG_INFO("SHAKKA_LOG: RSSI (via BTM CB) para %s: %d", bda.ToString().c_str(), rssi);
+    } else {
+         LOG_WARN("SHAKKA_LOG: Callback RSSI BTM recebido para ACL não encontrada/inativa: %s",
+                 bda.ToString().c_str());
+    }
+}
+
+#define RSSI_POLL_INTERVAL_MS 1000
 
 static void poll_rssi_cb(void* data) {
-  tACL_CONN* p_acl = static_cast<tACL_CONN*>(data);
+    tACL_CONN* p_acl = static_cast<tACL_CONN*>(data);
 
-  if (p_acl == nullptr || !p_acl->in_use) {
-    LOG_INFO("SHAKKA_LOG: poll_rssi_cb - Conexao ACL nao existe mais, parando o monitoramento.");
-    return;
-  }
+    if (p_acl == nullptr || !p_acl->in_use) {
+        LOG_INFO("SHAKKA_LOG: poll_rssi_cb - Conexão ACL não existe mais, parando poll.");
+        return;
+    }
 
-  LOG_INFO("SHAKKA_LOG: Monitorando RSSI para handle 0x%04x", p_acl->hci_handle);
-  btsnd_hcic_read_rssi(p_acl->hci_handle);
+    LOG_INFO("SHAKKA_LOG: Solicitando RSSI via BTM_ReadRssi para %s",
+             p_acl->remote_addr.ToString().c_str());
 
-  alarm_set(p_acl->rssi_poll_timer, RSSI_POLL_INTERVAL_MS, poll_rssi_cb, p_acl);
+    tBTM_STATUS status = BTM_ReadRSSI(p_acl->remote_addr, btm_acl_rssi_result_cb);
+
+    if (status != BTM_CMD_STARTED && status != BTM_SUCCESS) {
+        LOG_WARN("SHAKKA_LOG: Falha ao iniciar BTM_ReadRssi, status: %d", status);
+    }
+
+    alarm_set(p_acl->rssi_poll_timer, RSSI_POLL_INTERVAL_MS, poll_rssi_cb, p_acl);
 }
 
 // =======================================
@@ -536,16 +570,6 @@ void btm_acl_removed(uint16_t handle) {
     log::warn("Unable to find active acl");
     return;
   }
-
-  // ========== SHAKKA ===========
-  if (p_acl->rssi_poll_timer != nullptr) {
-    LOG_INFO(
-        "SHAKKA_LOG: ACL removida. Parando monitoramento de RSSI para %s.",
-        p_acl->remote_addr.ToString().c_str());
-    alarm_free(p_acl->rssi_poll_timer);
-    p_acl->rssi_poll_timer = nullptr;
-  }
-  // ===========================
 
   p_acl->in_use = false;
   NotifyAclLinkDown(*p_acl);
@@ -1952,8 +1976,8 @@ if (evt_len < 4) {
   uint8_t status = p[0];
   uint16_t handle = p[1] | (p[2] << 8);
   int8_t rssi = (int8_t)p[3];
-  LOG_INFO("SHAKKA_LOG: btm_read_rssi_complete -> handle:0x%04x, status:%d, rssi:%d",
-           handle, status, rssi);
+  //LOG_INFO("SHAKKA_LOG: btm_read_rssi_complete -> handle:0x%04x, status:%d, rssi:%d",
+  //         handle, status, rssi);
 
 // ==============================================================
 
@@ -2572,6 +2596,29 @@ void btm_acl_connected(const RawAddress& bda, uint16_t handle,
 
 void btm_acl_disconnected(tHCI_STATUS status, uint16_t handle,
                           tHCI_REASON reason) {
+  // ================== SHAKKA ==================
+  tACL_CONN* p_acl = internal_.acl_get_connection_from_handle(handle);
+  
+  if (p_acl != nullptr) {
+
+    p_acl->last_disconnect_reason = reason;
+      LOG_INFO("SHAKKA_LOG: Armazenando motivo 0x%02x para %s", reason,
+               p_acl->remote_addr.ToString().c_str());
+               
+    if (p_acl->rssi_poll_timer != nullptr) {
+      LOG_INFO("SHAKKA_LOG: ACL desconectada. Parando monitoramento RSSI para %s.",
+               p_acl->remote_addr.ToString().c_str());
+      alarm_free(p_acl->rssi_poll_timer);
+      p_acl->rssi_poll_timer = nullptr;
+    }
+     LOG_INFO("SHAKKA_LOG: Desconexão completa. Handle: 0x%04x, Status: %d, Reason: 0x%02x (%s)",
+              handle, status, reason, hci_reason_code_text(reason).c_str());
+
+  } else {
+     log::warn("SHAKKA_LOG: Nao foi possivel encontrar ACL ativa para handle {}", handle);
+  }
+  // =====================================================================
+  
   if (status != HCI_SUCCESS) {
     log::warn("Received disconnect with error:{}",
               hci_error_code_text(status).c_str());

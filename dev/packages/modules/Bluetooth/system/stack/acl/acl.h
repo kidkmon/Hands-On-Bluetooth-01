@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "stack/include/hci_error_code.h"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -182,6 +184,8 @@ struct tACL_CONN {
 
   // ======================= SHAKKA ================
   alarm_t* rssi_poll_timer;
+  int8_t   last_known_rssi;
+  tHCI_REASON last_disconnect_reason;
   // ===========================================
   RawAddress active_remote_addr;
   tBLE_ADDR_TYPE active_remote_addr_type;
