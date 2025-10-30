@@ -30,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BluetoothBroadcastApp";
     public static final String MONITORAMENTO_PREFS_NAME = "MonitoramentoPrefs";
     // Variavel com o valor booleano true/false
-    public static final String KEY_MONITORAMENTO_ENABLED = "key_monitoramento_enabled";
+    public static final String MONITORAMENTO_KEY_ENABLED = "MonitoramentoKeyEnabled";
 
     private static final int REQUEST_BLUETOOTH_CONNECT_PERMISSION = 101;
     private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08;
@@ -213,7 +213,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         SharedPreferences prefs = getSharedPreferences(MONITORAMENTO_PREFS_NAME, Context.MODE_PRIVATE);
-        boolean isSwitchEnabled = prefs.getBoolean(KEY_MONITORAMENTO_ENABLED, false);
+        boolean isSwitchEnabled = prefs.getBoolean(MONITORAMENTO_KEY_ENABLED, false);
 
         switchBluetooth.setChecked(isSwitchEnabled);
 
@@ -226,7 +226,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             SharedPreferences.Editor editor = getSharedPreferences(MONITORAMENTO_PREFS_NAME, Context.MODE_PRIVATE).edit();
-            editor.putBoolean(KEY_MONITORAMENTO_ENABLED, isChecked);
+            editor.putBoolean(MONITORAMENTO_KEY_ENABLED, isChecked);
             editor.apply();
         });
     }
