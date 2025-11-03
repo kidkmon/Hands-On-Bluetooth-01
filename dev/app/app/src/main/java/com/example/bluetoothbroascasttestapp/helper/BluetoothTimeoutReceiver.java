@@ -1,4 +1,4 @@
-package com.example.bluetoothbroascasttestapp;
+package com.example.bluetoothbroascasttestapp.helper;
 
 import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;

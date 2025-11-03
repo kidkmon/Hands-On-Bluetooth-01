@@ -1,4 +1,4 @@
-package com.example.bluetoothbroascasttestapp;
+package com.example.bluetoothbroascasttestapp.views;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat;
 import com.android.bluetooth.btservice.AdapterNativeInterface;
 import com.android.bluetooth.btservice.AdapterService;
 import com.android.bluetooth.Utils;
+import com.example.bluetoothbroascasttestapp.R;
 
 public class MainActivity extends AppCompatActivity {
 
