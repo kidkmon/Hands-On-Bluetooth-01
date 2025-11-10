@@ -753,8 +753,13 @@ public class AdapterService extends Service {
             Log.w(TAG, "Unable to resolve SystemUI's UID.", e);
         }
 
-        Intent intent = new Intent(this, DisconnectNotificationService.class);
+        Log.i(TAG, "SHAKKA_LOG: AdapterService.onCreate() - PRESTES A INICIAR DisconnectNotificationService com Ação...");
+        // Usa a action para iniciar o servico
+        Intent intent = new Intent(DisconnectNotificationService.ACTION_START_MONITORING);
+        // Define explicitamente a classe do servico
+        intent.setClass(this, DisconnectNotificationService.class);
         startService(intent);
+        Log.i(TAG, "SHAKKA_LOG: AdapterService.onCreate() - DEPOIS DE INICIAR DisconnectNotificationService");
     }
 
     @Override

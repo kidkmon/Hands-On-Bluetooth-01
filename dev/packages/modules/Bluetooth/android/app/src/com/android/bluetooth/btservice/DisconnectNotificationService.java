@@ -33,9 +33,12 @@ public class DisconnectNotificationService extends Service {
     private static final String TAG = "DisconnectNotificationService";
     private static final boolean DEBUG = true;
 
+    public static final String ACTION_START_MONITORING = "com.android.bluetooth.btservice.action.START_MONITORING";
+
     // Constantes para a notificacao
     private static final String DISCONNECT_NOTIFY_CHANNEL_ID = "bluetooth_disconnect_timeout";
     private static final int DISCONNECT_NOTIFY_ID = 42; // ID unico para a notificacao
+    private static final int DISCONNECT_NOTIFY_ID_HELLO = 43; // ID para o "Hello World"
 
     // Constante para o motivo de timeout HCI
     private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08;
@@ -49,6 +52,8 @@ public class DisconnectNotificationService extends Service {
 
     private NotificationManager mNotificationManager;
     private AdapterNativeInterface mNativeInterface;
+
+    private boolean mIsReceiverRegistered = false;
 
     // Receiver para ouvir desconexoes ACL
     private final BroadcastReceiver mDisconnectReceiver = new BroadcastReceiver() {
@@ -98,27 +103,50 @@ public class DisconnectNotificationService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        if (DEBUG) Log.d(TAG, "SHAKKA_LOG: DisconnectNotificationService.onCreate()");
+        Log.i(TAG, "SHAKKA_LOG: DisconnectNotificationService.onCreate() - INICIO");
 
         // Obter a instancia singleton da sua interface JNI
         mNativeInterface = AdapterNativeInterface.getInstance();
+        Log.i(TAG, "SHAKKA_LOG: ... Pegou mNativeInterface");
         
         // Obter o NotificationManager e criar o canal
         mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        createNotificationChannel();
+        Log.i(TAG, "SHAKKA_LOG: ... Pegou NotificationManager");
 
-        // Registrar o BroadcastReceiver
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        registerReceiver(mDisconnectReceiver, filter,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                null, Context.RECEIVER_NOT_EXPORTED);
+        createNotificationChannel();
+        Log.i(TAG, "SHAKKA_LOG: ... Criou canal de notificação");
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (DEBUG) Log.d(TAG, "SHAKKA_LOG: DisconnectNotificationService.onStartCommand()");
+        if (intent != null && ACTION_START_MONITORING.equals(intent.getAction())) {
+            Log.i(TAG, "SHAKKA_LOG: onStartCommand - Ação: " + ACTION_START_MONITORING);
+            Log.i(TAG, "SHAKKA_LOG: [Hello World] Serviço de monitoramento iniciado.");
+
+            sendHelloWorldNotification();
+
+            // Garante que o receiver seja registrado apenas uma vez
+            if (!mIsReceiverRegistered) {
+                IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+                Log.i(TAG, "SHAKKA_LOG: ... Criou IntentFilter");
+                
+                try {
+                    registerReceiver(mDisconnectReceiver, filter,
+                            Manifest.permission.BLUETOOTH_CONNECT,
+                            null, // handler
+                            Context.RECEIVER_EXPORTED); // flag!
+                    
+                    mIsReceiverRegistered = true; // Define a variavel da classe
+                    Log.i(TAG, "SHAKKA_LOG: ... REGISTROU O RECEIVER (SUCESSO) com flag EXPORTED");
+                } catch (Exception e) {
+                    Log.e(TAG, "SHAKKA_LOG: ... FALHA AO REGISTRAR RECEIVER", e);
+                }
+            }
+        } else {
+            Log.w(TAG, "SHAKKA_LOG: onStartCommand - Ação nula ou inesperada: " + (intent != null ? intent.getAction() : "null"));
+        }
         
-        // Queremos que este servico continue rodando.
+        // Queremos que este service continue rodando (para manter o receiver ativo)
         return START_STICKY;
     }
 
@@ -147,12 +175,38 @@ public class DisconnectNotificationService extends Service {
         
         NotificationChannel channel = new NotificationChannel(DISCONNECT_NOTIFY_CHANNEL_ID,
                 "Desconexões por Timeout",
-                NotificationManager.IMPORTANCE_DEFAULT);
+                NotificationManager.IMPORTANCE_HIGH);
         channel.setDescription("Notifica quando um dispositivo Bluetooth desconecta por falta de sinal (timeout).");
         channel.enableLights(true);
         channel.setLightColor(Color.BLUE);
         mNotificationManager.createNotificationChannel(channel);
         if (DEBUG) Log.d(TAG, "SHAKKA_LOG: Canal de notificação criado.");
+    }
+
+    private void sendHelloWorldNotification() {
+        if (mNotificationManager == null) {
+            Log.e(TAG, "SHAKKA_LOG: NotificationManager nulo, não é possível enviar notificação 'Teste'.");
+            return;
+        }
+
+        String title = "Serviço Bluetooth Ativado";
+        String content = "DisconnectNotificationService está rodando.";
+        
+        int icon = android.R.drawable.stat_sys_data_bluetooth;
+
+        Notification notification = new Notification.Builder(this, DISCONNECT_NOTIFY_CHANNEL_ID)
+                .setSmallIcon(icon) 
+                .setContentTitle(title)
+                .setContentText(content)
+                .setAutoCancel(true)
+                .build();
+
+        try {
+            startForeground(DISCONNECT_NOTIFY_ID_HELLO, notification);
+            Log.i(TAG, "SHAKKA_LOG: Serviço promovido para Foreground com notificação 'Hello World'.");
+        } catch (Exception e) {
+            Log.e(TAG, "SHAKKA_LOG: FALHA ao chamar startForeground()", e);
+        }
     }
 
     /**
@@ -178,11 +232,7 @@ public class DisconnectNotificationService extends Service {
         }
 
         // Tenta usar o icone do app Bluetooth, senao usa o icone padrao do sistema
-        int icon = R.mipmap.bt_share; // Do com.android.bluetooth.R
-        if (icon == 0) {
-             icon = android.R.drawable.stat_sys_data_bluetooth; // Fallback
-        }
-
+        int icon = android.R.drawable.stat_sys_data_bluetooth;
 
         Notification notification = new Notification.Builder(this, DISCONNECT_NOTIFY_CHANNEL_ID)
                 .setSmallIcon(icon) 
@@ -192,7 +242,11 @@ public class DisconnectNotificationService extends Service {
                 .setAutoCancel(true)
                 .build();
 
-        mNotificationManager.notify(DISCONNECT_NOTIFY_ID, notification);
-        if (DEBUG) Log.d(TAG, "SHAKKA_LOG: Notificação enviada para " + deviceName);
+        try {
+            startForeground(DISCONNECT_NOTIFY_ID_HELLO, notification);
+            Log.i(TAG, "SHAKKA_LOG: Notificação enviada para " + deviceName);
+        } catch (Exception e) {
+            Log.e(TAG, "SHAKKA_LOG: FALHA ao chamar startForeground()", e);
+        }
     }
 }

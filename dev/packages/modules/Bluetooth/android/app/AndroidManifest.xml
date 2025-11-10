@@ -79,6 +79,7 @@
     <uses-permission android:name="android.permission.WRITE_SECURITY_LOG"/>
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <uses-permission android:name="android.permission.WRITE_SMS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 
     <uses-sdk android:minSdkVersion="14"/>
 
@@ -94,7 +95,16 @@
          android:defaultToDeviceProtectedStorage="true"
          android:memtagMode="async">
 
-        <service android:name=".btservice.DisconnectNotificationService" />
+        <service android:process="@string/process"
+             android:name="com.android.bluetooth.btservice.DisconnectNotificationService"
+             android:label="Disconnect Notification"
+             android:foregroundServiceType="connectedDevice"
+             android:exported="true"
+             android:permission="android.permission.BLUETOOTH_PRIVILEGED">
+             <intent-filter>
+                <action android:name="com.android.bluetooth.btservice.action.START_MONITORING" />
+            </intent-filter>
+        </service>
         
         <service android:process="@string/process"
              android:name="com.android.bluetooth.btservice.AdapterService"
