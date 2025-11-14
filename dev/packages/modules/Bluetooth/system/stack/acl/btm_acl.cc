@@ -83,7 +83,7 @@
 #include "stack/include/main_thread.h"
 #include "types/hci_role.h"
 #include "types/raw_address.h"
-// ================ SHAKKA ===========
+// ========================
 #include "osi/include/alarm.h"
 #include "btif/include/btif_dm.h"
 #include "btif/include/btif_api.h"
@@ -128,6 +128,8 @@ struct StackAclBtmAcl {
   }
   void btm_acl_consolidate(const RawAddress& identity_addr,
                            const RawAddress& rpa);
+  tACL_CONN* btm_bda_to_acl_even_if_not_in_use(const RawAddress& bda,
+                                                 tBT_TRANSPORT transport);
 };
 
 struct RoleChangeView {
@@ -324,6 +326,19 @@ tACL_CONN* StackAclBtmAcl::btm_bda_to_acl(const RawAddress& bda,
   return nullptr;
 }
 
+// Esta e a implementacao da funcao que tem acesso ao acl_db
+tACL_CONN* StackAclBtmAcl::btm_bda_to_acl_even_if_not_in_use(
+    const RawAddress& bda, tBT_TRANSPORT transport) {
+  tACL_CONN* p_acl = &btm_cb.acl_cb_.acl_db[0];
+  for (uint8_t index = 0; index < MAX_L2CAP_LINKS; index++, p_acl++) {
+    // A verificacao (p_acl->in_use) foi removida
+    if (p_acl->remote_addr == bda && p_acl->transport == transport) {
+      return p_acl;
+    }
+  }
+  return nullptr;
+}
+
 tACL_CONN* acl_get_connection_from_address(const RawAddress& bd_addr,
                                            tBT_TRANSPORT transport) {
   return internal_.btm_bda_to_acl(bd_addr, transport);
@@ -421,7 +436,7 @@ tACL_CONN* StackAclBtmAcl::acl_allocate_connection() {
   return nullptr;
 }
 
-// ========= SHAKKA =========================
+// ==================================
 // callback que recebe o resultado do BTM_ReadRssi
 static void btm_acl_rssi_result_cb(void* p_data) {
     tBTM_RSSI_RESULT* p_rssi_result = static_cast<tBTM_RSSI_RESULT*>(p_data);
@@ -477,6 +492,9 @@ void btm_acl_created(const RawAddress& bda, uint16_t hci_handle,
                      tHCI_ROLE link_role, tBT_TRANSPORT transport) {
   tACL_CONN* p_acl = internal_.btm_bda_to_acl(bda, transport);
   if (p_acl != (tACL_CONN*)NULL) {
+    
+    p_acl->Reset();
+
     p_acl->hci_handle = hci_handle;
     p_acl->link_role = link_role;
     p_acl->transport = transport;
@@ -497,6 +515,8 @@ void btm_acl_created(const RawAddress& bda, uint16_t hci_handle,
     return;
   }
 
+  p_acl->Reset();
+
   p_acl->in_use = true;
   p_acl->hci_handle = hci_handle;
   p_acl->link_role = link_role;
@@ -507,7 +527,7 @@ void btm_acl_created(const RawAddress& bda, uint16_t hci_handle,
   p_acl->switch_role_failed_attempts = 0;
   p_acl->reset_switch_role();
 
-  // ================== SHAKKA =================
+  // =================================
   LOG_INFO(
       "SHAKKA_LOG: ACL criada. Iniciando monitoramento periódico de RSSI para %s.",
       bda.ToString().c_str());
@@ -576,7 +596,7 @@ void btm_acl_removed(uint16_t handle) {
   if (p_acl->is_transport_br_edr()) {
     BTM_PM_OnDisconnected(handle);
   }
-  p_acl->Reset();
+  // p_acl->Reset();
 }
 
 /*******************************************************************************
@@ -1965,7 +1985,7 @@ void btm_read_rssi_timeout(UNUSED_ATTR void* data) {
  ******************************************************************************/
 void btm_read_rssi_complete(uint8_t* p, uint16_t evt_len) {
 
-/* =========================== SHAKKA ===========================
+/* ======================================================
   Trying to get rssi logs
    ==============================================================
 */
@@ -2596,7 +2616,7 @@ void btm_acl_connected(const RawAddress& bda, uint16_t handle,
 
 void btm_acl_disconnected(tHCI_STATUS status, uint16_t handle,
                           tHCI_REASON reason) {
-  // ================== SHAKKA ==================
+  // ===================================
   tACL_CONN* p_acl = internal_.acl_get_connection_from_handle(handle);
   
   if (p_acl != nullptr) {
@@ -2902,6 +2922,15 @@ tACL_CONN* btm_acl_for_bda(const RawAddress& bd_addr, tBT_TRANSPORT transport) {
     return nullptr;
   }
   return p_acl;
+}
+
+// Esta eh uma copia de btm_acl_for_bda, mas sem a verificacao "in_use",
+// para que a JNI possa ler o motivo da desconexao mesmo apos
+// btm_acl_removed() ter sido chamado.
+tACL_CONN* btm_acl_for_bda_even_if_not_in_use(const RawAddress& bd_addr,
+                                                tBT_TRANSPORT transport) {
+  // Chama a nova função membro "friend" que acabamos de declarar
+  return internal_.btm_bda_to_acl_even_if_not_in_use(bd_addr, transport);
 }
 
 void find_in_device_record(const RawAddress& bd_addr,

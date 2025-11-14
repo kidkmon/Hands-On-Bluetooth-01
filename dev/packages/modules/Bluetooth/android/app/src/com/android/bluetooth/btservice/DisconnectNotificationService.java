@@ -41,7 +41,7 @@ public class DisconnectNotificationService extends Service {
     private static final int DISCONNECT_NOTIFY_ID_HELLO = 43; // ID para o "Hello World"
 
     // Constante para o motivo de timeout HCI
-    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08;
+    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x13; // mudado para 0x13 para fins de facilitar os testes, reason correto para timeout: 0x08
 
     // Propriedade do sistema para habilitar/desabilitar a feature via ADB
     // adb shell setprop persist.bluetooth.disconnect_notify.enabled true
@@ -53,57 +53,27 @@ public class DisconnectNotificationService extends Service {
     private NotificationManager mNotificationManager;
     private AdapterNativeInterface mNativeInterface;
 
-    private boolean mIsReceiverRegistered = false;
+    // private boolean mIsReceiverRegistered = false;
 
-    // Receiver para ouvir desconexoes ACL
-    private final BroadcastReceiver mDisconnectReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action == null || !action.equals(BluetoothDevice.ACTION_ACL_DISCONNECTED)) {
-                return;
-            }
+    private static DisconnectNotificationService sInstance = null;
 
-            // verifica se a feature esta habilitada via ADB
-            if (!SystemProperties.getBoolean(PROP_DISCONNECT_NOTIFY_ENABLED, false)) {
-                if (DEBUG) Log.d(TAG, "ACL disconnect recebido, mas a notificação está desabilitada.");
-                return;
-            }
-
-            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            if (device == null) {
-                if (DEBUG) Log.w(TAG, "Broadcast de desconexão sem BluetoothDevice extra.");
-                return;
-            }
-
-            byte[] address = Utils.getByteAddress(device);
-            if (mNativeInterface == null) {
-                 Log.e(TAG, "mNativeInterface é nulo, não é possível obter o motivo da desconexão.");
-                 return;
-            }
-            
-            // chama as funcoes JNI
-            int reason = mNativeInterface.getDisconnectionReasonNative(address);
-            int rssi = mNativeInterface.getConnectedDeviceRssiNative(address); 
-
-            if (DEBUG) {
-                Log.d(TAG, "SHAKKA_LOG: DisconnectReceiver - Dispositivo: " + device.getAddress() 
-                           + ", Motivo: 0x" + Integer.toHexString(reason)
-                           + ", Último RSSI: " + rssi);
-            }
-
-            // verifica se o motivo eh Connection Timeout
-            if (reason == HCI_REASON_CONNECTION_TIMEOUT) {
-                Log.i(TAG, "SHAKKA_LOG: Desconexão por Timeout (0x08) detectada para " + device.getAddress());
-                sendDisconnectNotification(device, rssi);
-            }
+    /*
+     Retorna a instancia singleton do serviço.
+     */
+    public static DisconnectNotificationService getInstance() {
+        if (sInstance == null) {
+            Log.e(TAG, "SHAKKA_LOG: DisconnectNotificationService.getInstance() chamado, mas sInstance é nulo!");
         }
-    };
+        return sInstance;
+    }
 
     @Override
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "SHAKKA_LOG: DisconnectNotificationService.onCreate() - INICIO");
+
+        // Define a instancia do Singleton
+        sInstance = this;
 
         // Obter a instancia singleton da sua interface JNI
         mNativeInterface = AdapterNativeInterface.getInstance();
@@ -125,23 +95,6 @@ public class DisconnectNotificationService extends Service {
 
             sendHelloWorldNotification();
 
-            // Garante que o receiver seja registrado apenas uma vez
-            if (!mIsReceiverRegistered) {
-                IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-                Log.i(TAG, "SHAKKA_LOG: ... Criou IntentFilter");
-                
-                try {
-                    registerReceiver(mDisconnectReceiver, filter,
-                            Manifest.permission.BLUETOOTH_CONNECT,
-                            null, // handler
-                            Context.RECEIVER_EXPORTED); // flag!
-                    
-                    mIsReceiverRegistered = true; // Define a variavel da classe
-                    Log.i(TAG, "SHAKKA_LOG: ... REGISTROU O RECEIVER (SUCESSO) com flag EXPORTED");
-                } catch (Exception e) {
-                    Log.e(TAG, "SHAKKA_LOG: ... FALHA AO REGISTRAR RECEIVER", e);
-                }
-            }
         } else {
             Log.w(TAG, "SHAKKA_LOG: onStartCommand - Ação nula ou inesperada: " + (intent != null ? intent.getAction() : "null"));
         }
@@ -154,14 +107,48 @@ public class DisconnectNotificationService extends Service {
     public void onDestroy() {
         if (DEBUG) Log.d(TAG, "SHAKKA_LOG: DisconnectNotificationService.onDestroy()");
         
-        // Limpar o receiver
-        unregisterReceiver(mDisconnectReceiver);
+        // Limpa a instancia do Singleton
+        sInstance = null;
+
         super.onDestroy();
     }
 
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    /*
+     Este metodo e chamado pelo JniCallbacks
+     quando um evento de desconexao ACL ocorre.
+     */
+    public void onAclDisconnected(byte[] address) {
+        final String TAG = "DisconnectNotificationService"; // Para logs
+        Log.i(TAG, "SHAKKA_LOG: [onAclDisconnected] Evento recebido!");
+
+        // Verificar se a feature está habilitada
+        if (!SystemProperties.getBoolean(PROP_DISCONNECT_NOTIFY_ENABLED, false)) {
+            Log.d(TAG, "SHAKKA_LOG: [onAclDisconnected] Notificação desabilitada via prop.");
+            return;
+        }
+
+        // verificar se o motivo eh Connection Timeout
+        int reason = mNativeInterface.getDisconnectionReasonNative(address);
+        Log.i(TAG, "SHAKKA_LOG: [onAclDisconnected] Motivo buscado da JNI: 0x" + Integer.toHexString(reason));
+
+        if (reason == HCI_REASON_CONNECTION_TIMEOUT) {
+            BluetoothDevice device = AdapterService.getAdapterService().getDeviceFromByte(address);
+            if (device == null) {
+                Log.e(TAG, "SHAKKA_LOG: [onAclDisconnected] Dispositivo nulo, não é possível notificar.");
+                return;
+            }
+            
+            // CHAMAR JNI PARA BUSCAR O RSSI
+            int rssi = mNativeInterface.getConnectedDeviceRssiNative(address); 
+            
+            Log.i(TAG, "SHAKKA_LOG: [onAclDisconnected] Desconexão por Timeout (0x08) detectada. Enviando notificação.");
+            sendDisconnectNotification(device, rssi);
+        }
     }
 
     /**
@@ -243,10 +230,11 @@ public class DisconnectNotificationService extends Service {
                 .build();
 
         try {
-            startForeground(DISCONNECT_NOTIFY_ID_HELLO, notification);
-            Log.i(TAG, "SHAKKA_LOG: Notificação enviada para " + deviceName);
+            // Use o ID de notificacao correto (o 42)
+            mNotificationManager.notify(DISCONNECT_NOTIFY_ID, notification); 
+            Log.i(TAG, "SHAKKA_LOG: Notificação de TIMEOUT enviada para " + deviceName);
         } catch (Exception e) {
-            Log.e(TAG, "SHAKKA_LOG: FALHA ao chamar startForeground()", e);
+            Log.e(TAG, "SHAKKA_LOG: FALHA ao chamar mNotificationManager.notify()", e);
         }
     }
 }

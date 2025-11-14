@@ -182,7 +182,7 @@ struct tACL_CONN {
   /* Whether "Read Remote Version Information Complete" was received */
   bool remote_version_received{false};
 
-  // ======================= SHAKKA ================
+  // ======================================
   alarm_t* rssi_poll_timer;
   int8_t   last_known_rssi;
   tHCI_REASON last_disconnect_reason;
@@ -368,6 +368,8 @@ struct tACL_CB {
 };
 
 tACL_CONN* btm_acl_for_bda(const RawAddress& bd_addr, tBT_TRANSPORT transport);
+
+tACL_CONN* btm_acl_for_bda_even_if_not_in_use(const RawAddress& bd_addr, tBT_TRANSPORT transport);
 
 void btm_acl_encrypt_change(uint16_t handle, uint8_t status,
                             uint8_t encr_enable);

@@ -109,7 +109,7 @@ bool isCallbackThread() {
   return sHaveCallbackThread && pthread_equal(sCallbackThread, pthread_self());
 }
 
-// ========== SHAKKA ================
+// ========================
 // Funcao JNI para obter o RSSI cacheado
 static jint getConnectedDeviceRssiNative(JNIEnv* env, [[maybe_unused]] jobject obj, jbyteArray address) {
     CallbackEnv sCallbackEnv(__func__);
@@ -154,7 +154,7 @@ static jint getDisconnectionReasonNative(JNIEnv* env, [[maybe_unused]] jobject o
     bd_addr.FromOctets(reinterpret_cast<const uint8_t*>(addr));
     env->ReleaseByteArrayElements(address, addr, JNI_ABORT);
 
-    tACL_CONN* p_acl = btm_acl_for_bda(bd_addr, BT_TRANSPORT_BR_EDR); // Ajuste transport se necessario
+    tACL_CONN* p_acl = btm_acl_for_bda_even_if_not_in_use(bd_addr, BT_TRANSPORT_BR_EDR);
 
     if (p_acl != nullptr) { // Nao precisa checar in_use, queremos o ultimo motivo
         log::info("SHAKKA_LOG JNI: Retornando motivo %d para %s",
