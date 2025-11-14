@@ -41,7 +41,7 @@ public class DisconnectNotificationService extends Service {
     private static final int DISCONNECT_NOTIFY_ID_HELLO = 43; // ID para o "Hello World"
 
     // Constante para o motivo de timeout HCI
-    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x13; // mudado para 0x13 para fins de facilitar os testes, reason correto para timeout: 0x08
+    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08; // 0x13 para fins de facilitar os testes, reason correto para timeout: 0x08
 
     // Propriedade do sistema para habilitar/desabilitar a feature via ADB
     // adb shell setprop persist.bluetooth.disconnect_notify.enabled true
