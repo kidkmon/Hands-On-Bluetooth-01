@@ -38,10 +38,12 @@ public class DisconnectNotificationService extends Service {
     // Constantes para a notificacao
     private static final String DISCONNECT_NOTIFY_CHANNEL_ID = "bluetooth_disconnect_timeout";
     private static final int DISCONNECT_NOTIFY_ID = 42; // ID unico para a notificacao
-    private static final int DISCONNECT_NOTIFY_ID_HELLO = 43; // ID para o "Hello World"
+    
+    private static final String FOREGROUND_CHANNEL_ID = "bluetooth_disconnect_service";
+    private static final int FOREGROUND_NOTIFY_ID = 43; // notificacao silenciosa
 
     // Constante para o motivo de timeout HCI
-    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08; // 0x13 para fins de facilitar os testes, reason correto para timeout: 0x08
+    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08; // mudado para 0x13 para fins de facilitar os testes, reason correto para timeout: 0x08
 
     // Propriedade do sistema para habilitar/desabilitar a feature via ADB
     // adb shell setprop persist.bluetooth.disconnect_notify.enabled true
@@ -91,9 +93,9 @@ public class DisconnectNotificationService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_START_MONITORING.equals(intent.getAction())) {
             Log.i(TAG, "SHAKKA_LOG: onStartCommand - Ação: " + ACTION_START_MONITORING);
-            Log.i(TAG, "SHAKKA_LOG: [Hello World] Serviço de monitoramento iniciado.");
+            Log.i(TAG, "SHAKKA_LOG: Serviço de monitoramento iniciado.");
 
-            sendHelloWorldNotification();
+            startSilentForeground();
 
         } else {
             Log.w(TAG, "SHAKKA_LOG: onStartCommand - Ação nula ou inesperada: " + (intent != null ? intent.getAction() : "null"));
@@ -167,30 +169,36 @@ public class DisconnectNotificationService extends Service {
         channel.enableLights(true);
         channel.setLightColor(Color.BLUE);
         mNotificationManager.createNotificationChannel(channel);
+
+        NotificationChannel foregroundChannel = new NotificationChannel(FOREGROUND_CHANNEL_ID,
+                "Monitoramento Bluetooth", 
+                NotificationManager.IMPORTANCE_MIN); // Importancia minima (sem som, sem pop-up)
+        foregroundChannel.setDescription("Serviço que monitora a conexão Bluetooth para eventos de timeout.");
+        mNotificationManager.createNotificationChannel(foregroundChannel);
+
         if (DEBUG) Log.d(TAG, "SHAKKA_LOG: Canal de notificação criado.");
     }
 
-    private void sendHelloWorldNotification() {
+    private void startSilentForeground() {
         if (mNotificationManager == null) {
             Log.e(TAG, "SHAKKA_LOG: NotificationManager nulo, não é possível enviar notificação 'Teste'.");
             return;
         }
 
-        String title = "Serviço Bluetooth Ativado";
-        String content = "DisconnectNotificationService está rodando.";
-        
+        String title = "Monitoramento Bluetooth";
+        String content = "Monitorando ativamente a conexão Bluetooth.";
         int icon = android.R.drawable.stat_sys_data_bluetooth;
 
-        Notification notification = new Notification.Builder(this, DISCONNECT_NOTIFY_CHANNEL_ID)
-                .setSmallIcon(icon) 
-                .setContentTitle(title)
-                .setContentText(content)
-                .setAutoCancel(true)
-                .build();
+        Notification notification = new Notification.Builder(this, FOREGROUND_CHANNEL_ID) 
+            .setSmallIcon(icon) 
+            .setContentTitle(title)
+            .setContentText(content)
+            .setOngoing(true)
+            .build();
 
         try {
-            startForeground(DISCONNECT_NOTIFY_ID_HELLO, notification);
-            Log.i(TAG, "SHAKKA_LOG: Serviço promovido para Foreground com notificação 'Hello World'.");
+            startForeground(FOREGROUND_NOTIFY_ID, notification); 
+            Log.i(TAG, "SHAKKA_LOG: Serviço promovido para Foreground (Silencioso).");
         } catch (Exception e) {
             Log.e(TAG, "SHAKKA_LOG: FALHA ao chamar startForeground()", e);
         }
