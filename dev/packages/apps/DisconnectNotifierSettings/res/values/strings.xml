@@ -1,10 +1,10 @@
 <resources>
-    <string name="app_name">Configuracoes B-reminder</string>
-    <string name="feature_title">Recursos de Monitoramento</string>
+    <string name="app_name">B-reminder</string>
+    <string name="feature_title">Configurações</string>
 
-    <string name="toggle_timeout_notifier_title">Notificação de Timeout</string>
-    <string name="toggle_timeout_notifier_desc">Receber uma notificação quando um dispositivo Bluetooth desconectar por falta de sinal (timeout).</string>
+    <string name="toggle_timeout_notifier_title">Monitoramento Inteligente</string>
+    <string name="toggle_timeout_notifier_desc">Receber uma notificação quando um dispositivo Bluetooth desconectar por falta de sinal.</string>
     
     <string name="toggle_safe_zone_title">Zona Segura (WiFi)</string>
-    <string name="toggle_safe_zone_desc">(Futura feature) Manter o Bluetooth desativado automaticamente em locais confiáveis.</string>
+    <string name="toggle_safe_zone_desc">Desativar o Monitoramento Inteligente enquanto estiver conectado em Wifi confiáveis.</string>
 </resources>
