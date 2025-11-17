@@ -22,6 +22,8 @@ import com.android.bluetooth.Utils;
 import android.Manifest;
 import com.android.bluetooth.R; 
 
+import android.provider.Settings; // app
+
 /**
  * Service que roda no processo Bluetooth para monitorar desconexoes.
  * Ele ouve o broadcast ACTION_ACL_DISCONNECTED e, se a notificacao de timeout
@@ -47,7 +49,11 @@ public class DisconnectNotificationService extends Service {
 
     // Propriedade do sistema para habilitar/desabilitar a feature via ADB
     // adb shell setprop persist.bluetooth.disconnect_notify.enabled true
-    private static final String PROP_DISCONNECT_NOTIFY_ENABLED = "persist.bluetooth.disconnect_notify.enabled";
+    // private static final String PROP_DISCONNECT_NOTIFY_ENABLED = "persist.bluetooth.disconnect_notify.enabled";
+
+    // habilitar afeature via app:
+    private static final String SETTING_BLUETOOTH_TIMEOUT_NOTIFY = "breminder_bt_timeout_notify";
+
 
     // Valor padrao para RSSI invalido (igual ao da camada C++)
     private static final int RSSI_INVALID = -127;
@@ -128,9 +134,19 @@ public class DisconnectNotificationService extends Service {
         final String TAG = "DisconnectNotificationService"; // Para logs
         Log.i(TAG, "SHAKKA_LOG: [onAclDisconnected] Evento recebido!");
 
-        // Verificar se a feature está habilitada
-        if (!SystemProperties.getBoolean(PROP_DISCONNECT_NOTIFY_ENABLED, false)) {
-            Log.d(TAG, "SHAKKA_LOG: [onAclDisconnected] Notificação desabilitada via prop.");
+        // Verificar se a feature esta habilitada via prop
+        // if (!SystemProperties.getBoolean(PROP_DISCONNECT_NOTIFY_ENABLED, false)) {
+        //     Log.d(TAG, "SHAKKA_LOG: [onAclDisconnected] Notificação desabilitada via prop.");
+        //     return;
+        // }
+
+        // verificar se a feature esta habilitada (lendo de Settings.Global)
+        // O padrao e 1 (ATIVADO)
+        boolean isEnabled = Settings.Global.getInt(getContentResolver(), 
+                                SETTING_BLUETOOTH_TIMEOUT_NOTIFY, 1) == 1;
+
+        if (!isEnabled) {
+            Log.d(TAG, "SHAKKA_LOG: [onAclDisconnected] Notificação desabilitada via Settings.Global.");
             return;
         }
 
