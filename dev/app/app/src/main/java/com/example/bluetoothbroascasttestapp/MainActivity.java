@@ -1,18 +1,19 @@
 package com.example.bluetoothbroascasttestapp;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
-import android.bluetooth.BluetoothDevice;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.Build;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Switch;
+import android.provider.Settings;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -21,213 +22,152 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.android.bluetooth.btservice.AdapterNativeInterface;
-import com.android.bluetooth.btservice.AdapterService;
-import com.android.bluetooth.Utils;
+import com.google.android.material.switchmaterial.SwitchMaterial;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "BluetoothBroadcastApp";
-    public static final String MONITORAMENTO_PREFS_NAME = "MonitoramentoPrefs";
-    // Variavel com o valor booleano true/false
-    public static final String MONITORAMENTO_KEY_ENABLED = "MonitoramentoKeyEnabled";
+    private static final String TAG = "SettingsActivity";
 
-    private static final int REQUEST_BLUETOOTH_CONNECT_PERMISSION = 101;
-    private static final int HCI_REASON_CONNECTION_TIMEOUT = 0x08;
-    private static final int JNI_ERROR_REASON = -1;
+    public static final String SETTING_BLUETOOTH_TIMEOUT_NOTIFY = "breminder_bt_timeout_notify";
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
 
-    private TextView statusTextView;
-    private BroadcastReceiver aclReceiver;
-    private AdapterNativeInterface mNativeInterface = null;
+    private TextView textViewWifiName;
+    private Button buttonGetWifi;
+    private ListView listViewWifi;
+    private SwitchMaterial mTimeoutSwitch;
+    private SwitchMaterial mSafeZoneSwitch;
+
+    private List<String> wifiHistoryList = new ArrayList<>();
+    private ArrayAdapter<String> wifiListAdapter;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        statusTextView = findViewById(R.id.status_message);
-        statusTextView.setText("Aguardando eventos...");
 
+        mTimeoutSwitch = findViewById(R.id.switch_timeout_notifier);
+        mSafeZoneSwitch = findViewById(R.id.switch_safe_zone_wifi);
+
+        mTimeoutSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> saveSetting(isChecked));
+
+        loadSettings();
+        setupWifiComponents();
+        checkLocationPermission();
+    }
+
+    // --- Bluetooth ---
+
+    /**
+     * Carrega o valor atual do Settings.Global e atualiza o toggle.
+     */
+    private void loadSettings() {
+        boolean isEnabled = Settings.Global.getInt(getContentResolver(),
+                SETTING_BLUETOOTH_TIMEOUT_NOTIFY, 1) == 1;
+
+        mTimeoutSwitch.setChecked(isEnabled);
+        Log.d(TAG, "Configuração carregada: " + isEnabled);
+    }
+
+    /**
+     * Salva o novo estado (on/off) no Settings.Global.
+     */
+    private void saveSetting(boolean isEnabled) {
+        int value = isEnabled ? 1 : 0;
         try {
-            AdapterService service = AdapterService.getAdapterService();
-            if (service != null) {
-                mNativeInterface = service.getNative();
-                Log.i(TAG, "AdapterNativeInterface obtida via AdapterService.");
-            } else {
-                Log.e(TAG, "AdapterService é nulo. Acesso JNI pode falhar.");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao tentar obter AdapterNativeInterface: " + e.getMessage());
-            Toast.makeText(this, "Erro ao acessar interface Bluetooth interna.", Toast.LENGTH_LONG).show();
-            mNativeInterface = null;
-        }
+            Settings.Global.putInt(getContentResolver(),
+                    SETTING_BLUETOOTH_TIMEOUT_NOTIFY, value);
 
-        setupAclReceiver();
-        checkAndRequestBluetoothPermissions();
-        setupSwitchButtons();
-    }
-
-    private void setupAclReceiver() {
-        aclReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                if (intent == null) return;
-
-                if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(intent.getAction())) {
-                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-
-                    if (device == null) {
-                        Log.e(TAG, "Dispositivo nulo no broadcast ACTION_ACL_DISCONNECTED.");
-                        statusTextView.setText("Erro: Dispositivo nulo no evento.");
-                        return;
-                    }
-                    if (mNativeInterface == null) {
-                        Log.e(TAG, "Interface JNI não disponível para consultar o motivo.");
-                        statusTextView.setText("Erro: Interface JNI indisponível.");
-                        return;
-                    }
-
-                    String deviceAddress = device.getAddress();
-                    Log.d(TAG, "Broadcast ACTION_ACL_DISCONNECTED recebido para: " + deviceAddress);
-
-                    byte[] addressBytes = Utils.getBytesFromAddress(deviceAddress);
-                    int reasonCode = JNI_ERROR_REASON;
-                    try {
-                        reasonCode = mNativeInterface.getDisconnectionReasonNative(addressBytes);
-                        Log.i(TAG, "Motivo obtido via JNI para " + deviceAddress + ": " + reasonCode);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Erro ao chamar getDisconnectionReasonNative via JNI: " + e.getMessage());
-                        statusTextView.setText("Erro ao chamar JNI para obter motivo.");
-                        return;
-                    }
-
-                    String deviceName = "Dispositivo";
-                    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        try {
-                            if(device.getName() != null) deviceName = device.getName();
-                            else deviceName = deviceAddress;
-                        } catch (SecurityException se) {
-                            Log.w(TAG, "SecurityException ao obter nome, usando endereço MAC.", se);
-                            deviceName = deviceAddress;
-                        }
-                    } else {
-                        deviceName = deviceAddress;
-                        Log.w(TAG, "Sem permissão BLUETOOTH_CONNECT para obter o nome.");
-                    }
-
-                    if (reasonCode == HCI_REASON_CONNECTION_TIMEOUT) {
-                        String message = deviceName + " foi deixado para trás! (Timeout JNI)";
-                        statusTextView.setText(message);
-                        Toast.makeText(context, message, Toast.LENGTH_LONG).show();
-                        Log.w(TAG, message);
-                    } else if (reasonCode != JNI_ERROR_REASON && reasonCode != 0) {
-                        String message = deviceName + " desconectado. Motivo JNI: " + reasonCode;
-                        statusTextView.setText(message);
-                        Log.i(TAG, message);
-                    } else if (reasonCode == 0) {
-                        String message = deviceName + " desconectado normalmente.";
-                        statusTextView.setText(message);
-                        Log.i(TAG, message);
-                    } else {
-                        String message = deviceName + " desconectado. Motivo não pôde ser recuperado via JNI (código: " + reasonCode + ")";
-                        statusTextView.setText(message);
-                        Log.e(TAG, message);
-                    }
-                }
-            }
-        };
-    }
-
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerAclReceiver() {
-        if (aclReceiver == null) {
-            Log.e(TAG, "Receiver é nulo, não pode registrar.");
-            return;
-        }
-
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
-        String requiredPermission = android.Manifest.permission.BLUETOOTH_CONNECT;
-        Log.i(TAG, "Registrando AclReceiver para ACTION_ACL_DISCONNECTED...");
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(aclReceiver, filter, requiredPermission, null, Context.RECEIVER_NOT_EXPORTED);
-            } else {
-                registerReceiver(aclReceiver, filter, requiredPermission, null);
-            }
-            Log.i(TAG, "AclReceiver registrado com sucesso.");
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao registrar AclReceiver: " + e.getMessage());
-            Toast.makeText(this, "Erro ao registrar receiver Bluetooth.", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "Configuração salva: " + value);
+        } catch (SecurityException e) {
+            // Este erro ocorre se o app não tiver a permissão WRITE_SECURE_SETTINGS,
+            // que geralmente só é dada a apps do sistema (priv-app).
+            Log.e(TAG, "FALHA AO SALVAR CONFIGURAÇÃO! Verifique as permissões.", e);
+            mTimeoutSwitch.setChecked(!isEnabled);
         }
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (aclReceiver != null) {
-            try {
-                unregisterReceiver(aclReceiver);
-                Log.i(TAG, "AclReceiver desregistrado.");
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Tentativa de desregistrar Receiver que não estava registrado.");
-            }
-        }
+
+    // --- Wifi ---
+    private void setupWifiComponents() {
+        textViewWifiName = findViewById(R.id.textViewWifiName);
+        buttonGetWifi = findViewById(R.id.buttonGetWifi);
+        listViewWifi = findViewById(R.id.listViewWifi);
+
+        wifiListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, wifiHistoryList);
+        listViewWifi.setAdapter(wifiListAdapter);
+
+        buttonGetWifi.setOnClickListener(v -> {
+            checkLocationPermission();
+        });
     }
 
-    private void checkAndRequestBluetoothPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // API 31+
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                Log.w(TAG, "Solicitando permissão BLUETOOTH_CONNECT...");
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.BLUETOOTH_CONNECT}, REQUEST_BLUETOOTH_CONNECT_PERMISSION);
-            } else {
-                Log.i(TAG, "Permissão BLUETOOTH_CONNECT já concedida.");
-                registerAclReceiver();
-            }
+    private void checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST_CODE);
         } else {
-            Log.i(TAG, "API < 31. Permissões legadas assumidas via Manifest.");
-            registerAclReceiver();
+            getConnectedWifiName();
         }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_BLUETOOTH_CONNECT_PERMISSION) {
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.i(TAG, "Permissão BLUETOOTH_CONNECT concedida.");
-                registerAclReceiver();
+                getConnectedWifiName();
             } else {
-                Log.e(TAG, "Permissão BLUETOOTH_CONNECT negada.");
-                Toast.makeText(this, "Permissão de Bluetooth negada. O app não pode detectar desconexões.", Toast.LENGTH_LONG).show();
+                textViewWifiName.setText("Permissão de Localização negada.");
+                Toast.makeText(this, "Permissão de Localização é necessária.", Toast.LENGTH_SHORT).show();
             }
         }
     }
 
-    private void setupSwitchButtons() {
-        @SuppressLint("UseSwitchCompatOrMaterialCode") Switch switchBluetooth = findViewById(R.id.switchBluetooth);
+    private void getConnectedWifiName() {
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        ConnectivityManager connManager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
 
-        if (switchBluetooth == null) {
-            Log.e(TAG, "Erro: Não foi possível encontrar o Switch! Verifique o ID no XML.");
-            return;
+        String currentSsid = "Não conectado ao Wifi ou SSID indisponível";
+        boolean isConnectedToWifi = false;
+
+        if (connManager != null) {
+            Network network = connManager.getActiveNetwork();
+            if (network != null) {
+                NetworkCapabilities capabilities = connManager.getNetworkCapabilities(network);
+                if (capabilities != null && capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    isConnectedToWifi = true;
+                }
+            }
         }
 
-        SharedPreferences prefs = getSharedPreferences(MONITORAMENTO_PREFS_NAME, Context.MODE_PRIVATE);
-        boolean isSwitchEnabled = prefs.getBoolean(MONITORAMENTO_KEY_ENABLED, false);
+        if (isConnectedToWifi && wifiManager != null) {
+            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+            String ssid = wifiInfo.getSSID();
 
-        switchBluetooth.setChecked(isSwitchEnabled);
+            Log.d(TAG, "SSID bruto obtido: " + ssid);
 
-        switchBluetooth.setOnCheckedChangeListener((buttonView, isChecked) -> {
-
-            if (isChecked) {
-                Log.d(TAG, "Monitoramento Inteligente: ATIVADO");
-            } else {
-                Log.d(TAG, "Monitoramento Inteligente: DESATIVADO");
+            if (ssid != null && ssid.startsWith("\"") && ssid.endsWith("\"")) {
+                ssid = ssid.substring(1, ssid.length() - 1);
             }
 
-            SharedPreferences.Editor editor = getSharedPreferences(MONITORAMENTO_PREFS_NAME, Context.MODE_PRIVATE).edit();
-            editor.putBoolean(MONITORAMENTO_KEY_ENABLED, isChecked);
-            editor.apply();
-        });
+            if (ssid != null && !ssid.equals("<unknown ssid>")) {
+                currentSsid = ssid;
+            } else {
+                currentSsid = "SSID Indisponível (Verifique se a Localização/GPS do dispositivo está LIGADA)";
+                Log.w(TAG, "SSID não obtido: O serviço de Localização deve estar ativado.");
+            }
+        }
+
+        textViewWifiName.setText(currentSsid);
+
+        if (wifiHistoryList.isEmpty() || !wifiHistoryList.get(wifiHistoryList.size() - 1).equals(currentSsid)) {
+            wifiHistoryList.add(currentSsid);
+            wifiListAdapter.notifyDataSetChanged();
+        }
     }
 }

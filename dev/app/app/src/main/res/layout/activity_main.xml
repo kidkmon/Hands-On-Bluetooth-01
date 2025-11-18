@@ -1,42 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
     tools:context=".MainActivity">
 
     <TextView
-        android:id="@+id/status_message"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Status Bluetooth: Conectado (Aguardando eventos)"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"/>
+        android:text="@string/feature_title"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- Toggle 1: Notificacao de Timeout -->
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_timeout_notifier"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/toggle_timeout_notifier_title"
+        android:layout_marginBottom="8dp"
+        android:textSize="16sp"/>
 
     <TextView
-        android:id="@+id/textViewMonitoramentoBluetooth"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Monitoramento Inteligente"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/status_message"
-        app:layout_constraintVertical_bias="0.246" />
+        android:text="@string/toggle_timeout_notifier_desc"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="24dp"/>
 
-    <Switch
-        android:id="@+id/switchBluetooth"
+    <!-- Toggle 2: Zona Segura WiFi (Placeholder) -->
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_safe_zone_wifi"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/toggle_safe_zone_title"
+        android:layout_marginBottom="8dp"
+        android:textSize="16sp"/>
+
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.415"
-        app:layout_constraintStart_toEndOf="@+id/textViewMonitoramentoBluetooth"
-        app:layout_constraintTop_toBottomOf="@+id/status_message"
-        app:layout_constraintVertical_bias="0.227" />
+        android:text="@string/toggle_safe_zone_desc"
+        android:layout_marginStart="16dp"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:gravity="center_horizontal"
+        tools:context=".MainActivity">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nome do Wi-Fi Conectado:"
+            android:textSize="18sp"
+            android:layout_marginBottom="8dp"/>
+
+        <TextView
+            android:id="@+id/textViewWifiName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Aguardando verificação..."
+            android:textStyle="bold"
+            android:padding="10dp"
+            android:background="@android:color/holo_blue_light"
+            android:textColor="@android:color/white"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"/>
+
+        <Button
+            android:id="@+id/buttonGetWifi"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Verificar Wi-Fi Atual"/>
+
+        <ListView
+            android:id="@+id/listViewWifi"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="16dp"/>
+
+    </LinearLayout>
+
+</LinearLayout>
