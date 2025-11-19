@@ -2,6 +2,7 @@ package com.example.bluetoothbroascasttestapp;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -12,9 +13,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.provider.Settings;
 import android.widget.ArrayAdapter;
-import android.widget.Button;
 import android.widget.ListView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -25,23 +24,30 @@ import androidx.core.content.ContextCompat;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String TAG = "SettingsActivity";
+    private static final String TAG = "MainActivity";
 
-    public static final String SETTING_BLUETOOTH_TIMEOUT_NOTIFY = "breminder_bt_timeout_notify";
+    // Bluetooth Settings
+    public static final String BLUETOOTH_MONITORING_NOTIFY_KEY = "breminder_bt_timeout_notify";
+
+    // Wifi SafeZone Settings
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 100;
+    private static final String WIFI_SAFE_ZONE_PREFS_KEY = "WifiSafeZonePrefs";
+    private static final String WIFI_SAFE_ZONE_LIST_KEY = "WifiSafeZoneList";
+    private static final String WIFI_SAFE_ZONE_SWITCH_STATE_KEY = "WifiSafeZoneSwitchState";
 
-    private TextView textViewWifiName;
-    private Button buttonGetWifi;
-    private ListView listViewWifi;
-    private SwitchMaterial mTimeoutSwitch;
-    private SwitchMaterial mSafeZoneSwitch;
+    // Switch Buttons
+    private SwitchMaterial bluetoothMonitoringSwitch;
+    private SwitchMaterial wifiSafeZoneSwitch;
 
-    private List<String> wifiHistoryList = new ArrayList<>();
-    private ArrayAdapter<String> wifiListAdapter;
+    // Wifi SafeZone
+    private final List<String> wifiSafeZoneList = new ArrayList<>();
+    private ArrayAdapter<String> wifiSafeZoneListAdapter;
 
 
     @Override
@@ -49,92 +55,116 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mTimeoutSwitch = findViewById(R.id.switch_timeout_notifier);
-        mSafeZoneSwitch = findViewById(R.id.switch_safe_zone_wifi);
+        bluetoothMonitoringSwitch = findViewById(R.id.btMonitoringSwitch);
+        wifiSafeZoneSwitch = findViewById(R.id.wifiSafeZoneSwitch);
 
-        mTimeoutSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> saveSetting(isChecked));
+        bluetoothMonitoringSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> saveBluetoothMonitoringSettings(isChecked));
+        loadBluetoothMonitoringSettings();
 
-        loadSettings();
-        setupWifiComponents();
         checkLocationPermission();
+        loadWifiSafeZoneSettings();
+        setupWifiSafeZoneComponents();
     }
 
-    // --- Bluetooth ---
-
-    /**
-     * Carrega o valor atual do Settings.Global e atualiza o toggle.
-     */
-    private void loadSettings() {
+    // --- Bluetooth Monitoring ---
+    private void loadBluetoothMonitoringSettings() {
         boolean isEnabled = Settings.Global.getInt(getContentResolver(),
-                SETTING_BLUETOOTH_TIMEOUT_NOTIFY, 1) == 1;
-
-        mTimeoutSwitch.setChecked(isEnabled);
-        Log.d(TAG, "Configuração carregada: " + isEnabled);
+                BLUETOOTH_MONITORING_NOTIFY_KEY, 1) == 1;
+        bluetoothMonitoringSwitch.setChecked(isEnabled);
     }
 
-    /**
-     * Salva o novo estado (on/off) no Settings.Global.
-     */
-    private void saveSetting(boolean isEnabled) {
+    private void saveBluetoothMonitoringSettings(boolean isEnabled) {
         int value = isEnabled ? 1 : 0;
         try {
             Settings.Global.putInt(getContentResolver(),
-                    SETTING_BLUETOOTH_TIMEOUT_NOTIFY, value);
-
-            Log.d(TAG, "Configuração salva: " + value);
+                    BLUETOOTH_MONITORING_NOTIFY_KEY, value);
+            Log.d(TAG, "Configuração do Monitoramento bluetooth salva: " + value);
         } catch (SecurityException e) {
-            // Este erro ocorre se o app não tiver a permissão WRITE_SECURE_SETTINGS,
-            // que geralmente só é dada a apps do sistema (priv-app).
-            Log.e(TAG, "FALHA AO SALVAR CONFIGURAÇÃO! Verifique as permissões.", e);
-            mTimeoutSwitch.setChecked(!isEnabled);
+            bluetoothMonitoringSwitch.setChecked(!isEnabled);
+            Log.e(TAG, "Falha ao salvar configuração do Monitoramento bluetooth.", e);
         }
     }
 
 
-    // --- Wifi ---
-    private void setupWifiComponents() {
-        textViewWifiName = findViewById(R.id.textViewWifiName);
-        buttonGetWifi = findViewById(R.id.buttonGetWifi);
-        listViewWifi = findViewById(R.id.listViewWifi);
+    // --- Wifi Safe Zone ---
+    private void loadWifiSafeZoneSettings() {
+        boolean isChecked = getSharedPreferences(WIFI_SAFE_ZONE_PREFS_KEY, Context.MODE_PRIVATE)
+                .getBoolean(WIFI_SAFE_ZONE_SWITCH_STATE_KEY, false);
+        wifiSafeZoneSwitch.setChecked(isChecked);
 
-        wifiListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, wifiHistoryList);
-        listViewWifi.setAdapter(wifiListAdapter);
+        loadWifiSafeZoneList();
+    }
 
-        buttonGetWifi.setOnClickListener(v -> {
-            checkLocationPermission();
+    private void loadWifiSafeZoneList() {
+        Set<String> safeZoneSet = getSharedPreferences(WIFI_SAFE_ZONE_PREFS_KEY, Context.MODE_PRIVATE)
+                .getStringSet(WIFI_SAFE_ZONE_LIST_KEY, new HashSet<>());
+
+        wifiSafeZoneList.clear();
+        wifiSafeZoneList.addAll(safeZoneSet);
+    }
+
+    private void saveWifiSafeZoneSwitchState(boolean isChecked) {
+        getSharedPreferences(WIFI_SAFE_ZONE_PREFS_KEY, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(WIFI_SAFE_ZONE_SWITCH_STATE_KEY, isChecked)
+                .apply();
+    }
+
+    private void saveWifiSafeZoneList() {
+        Set<String> safeZoneSet = new HashSet<>(wifiSafeZoneList);
+
+        getSharedPreferences(WIFI_SAFE_ZONE_PREFS_KEY, Context.MODE_PRIVATE)
+                .edit()
+                .putStringSet(WIFI_SAFE_ZONE_LIST_KEY, safeZoneSet)
+                .apply();
+    }
+
+    private void setupWifiSafeZoneComponents() {
+        wifiSafeZoneSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            saveWifiSafeZoneSwitchState(isChecked);
+
+            Intent serviceIntent = new Intent(MainActivity.this, WifiMonitorService.class);
+
+            if (isChecked) {
+                addConnectedWifiToSafeZone();
+                startService(serviceIntent);
+                Toast.makeText(MainActivity.this, "Monitoramento da Zona Segura iniciado.", Toast.LENGTH_SHORT).show();
+
+            } else {
+                stopService(serviceIntent);
+                Toast.makeText(MainActivity.this, "Monitoramento da Zona Segura parado.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        ListView listViewWifi = findViewById(R.id.wifiSafeZoneList);
+        wifiSafeZoneListAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, wifiSafeZoneList);
+        listViewWifi.setAdapter(wifiSafeZoneListAdapter);
+
+        listViewWifi.setOnItemClickListener((parent, view, position, id) -> {
+            // Remove SSID da SafeZoneList
+            String removedSsid = wifiSafeZoneList.get(position);
+            wifiSafeZoneList.remove(position);
+            wifiSafeZoneListAdapter.notifyDataSetChanged();
+
+            saveWifiSafeZoneList();
+
+            if (wifiSafeZoneList.isEmpty()) {
+                wifiSafeZoneSwitch.setChecked(false);
+                saveWifiSafeZoneSwitchState(false);
+            }
+
+            Toast.makeText(this, removedSsid + " removido da Zona Segura.", Toast.LENGTH_SHORT).show();
         });
     }
 
-    private void checkLocationPermission() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                    LOCATION_PERMISSION_REQUEST_CODE);
-        } else {
-            getConnectedWifiName();
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                getConnectedWifiName();
-            } else {
-                textViewWifiName.setText("Permissão de Localização negada.");
-                Toast.makeText(this, "Permissão de Localização é necessária.", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
-
-    private void getConnectedWifiName() {
+    private void addConnectedWifiToSafeZone() {
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         ConnectivityManager connManager = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
 
-        String currentSsid = "Não conectado ao Wifi ou SSID indisponível";
+        String currentSsid;
         boolean isConnectedToWifi = false;
 
+        // Verifica se há conexão ativa com Wi-Fi
         if (connManager != null) {
             Network network = connManager.getActiveNetwork();
             if (network != null) {
@@ -149,8 +179,7 @@ public class MainActivity extends AppCompatActivity {
             WifiInfo wifiInfo = wifiManager.getConnectionInfo();
             String ssid = wifiInfo.getSSID();
 
-            Log.d(TAG, "SSID bruto obtido: " + ssid);
-
+            // Limpa as aspas do SSID
             if (ssid != null && ssid.startsWith("\"") && ssid.endsWith("\"")) {
                 ssid = ssid.substring(1, ssid.length() - 1);
             }
@@ -158,16 +187,43 @@ public class MainActivity extends AppCompatActivity {
             if (ssid != null && !ssid.equals("<unknown ssid>")) {
                 currentSsid = ssid;
             } else {
-                currentSsid = "SSID Indisponível (Verifique se a Localização/GPS do dispositivo está LIGADA)";
-                Log.w(TAG, "SSID não obtido: O serviço de Localização deve estar ativado.");
+                Toast.makeText(this, "SSID indisponível. Verifique se a Localização está ativa.", Toast.LENGTH_LONG).show();
+                wifiSafeZoneSwitch.setChecked(false);
+                saveWifiSafeZoneSwitchState(false);
+                return;
             }
+        } else {
+            Toast.makeText(this, "App não está conectado a uma rede Wi-Fi.", Toast.LENGTH_LONG).show();
+            wifiSafeZoneSwitch.setChecked(false);
+            saveWifiSafeZoneSwitchState(false);
+            return;
         }
 
-        textViewWifiName.setText(currentSsid);
+        if (!wifiSafeZoneList.contains(currentSsid)) {
+            wifiSafeZoneList.add(currentSsid);
+            wifiSafeZoneListAdapter.notifyDataSetChanged();
 
-        if (wifiHistoryList.isEmpty() || !wifiHistoryList.get(wifiHistoryList.size() - 1).equals(currentSsid)) {
-            wifiHistoryList.add(currentSsid);
-            wifiListAdapter.notifyDataSetChanged();
+            saveWifiSafeZoneList();
+        }
+    }
+
+    private void checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST_CODE);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (!(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+                wifiSafeZoneSwitch.setChecked(false);
+                saveWifiSafeZoneSwitchState(false);
+                Toast.makeText(this, "Permissão de Localização é necessária para Zona Segura.", Toast.LENGTH_LONG).show();
+            }
         }
     }
 }

@@ -7,4 +7,5 @@
 
     <string name="toggle_safe_zone_title">Zona Segura (WiFi)</string>
     <string name="toggle_safe_zone_desc">Desativar o Monitoramento Inteligente enquanto estiver conectado em Wifi confiáveis.</string>
+    <string name="wifi_safe_zone_list">Redes Wifi da Zona Segura:</string>
 </resources>
