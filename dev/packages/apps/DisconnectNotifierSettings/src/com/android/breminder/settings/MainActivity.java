@@ -144,6 +144,26 @@ public class MainActivity extends AppCompatActivity {
         // Se o ListView existir no layout, define o adapter
         if (mWifiSafeZoneListView != null) {
             mWifiSafeZoneListView.setAdapter(mWifiSafeZoneListAdapter);
+
+            mWifiSafeZoneListView.setOnItemLongClickListener(new android.widget.AdapterView.OnItemLongClickListener() {
+                @Override
+                public boolean onItemLongClick(android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
+                    String wifiToRemove = mWifiSafeZoneList.get(position);
+                    
+                    mWifiSafeZoneList.remove(position);
+                    mWifiSafeZoneListAdapter.notifyDataSetChanged();
+                    
+                    saveWifiSafeZoneList();
+                    
+                    Toast.makeText(MainActivity.this, "Removido: " + wifiToRemove, Toast.LENGTH_SHORT).show();
+                    
+                    if (mSafeZoneSwitch.isChecked()) {
+                        startWifiMonitorService();
+                    }
+                    
+                    return true; 
+                }
+            });
         }
     }
 
