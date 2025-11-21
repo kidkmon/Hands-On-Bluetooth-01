@@ -27,7 +27,10 @@ public class WifiMonitorService extends Service {
 
     private static final String TAG = "WifiMonitorService";
 
-    private static final String BLUETOOTH_MONITORING_NOTIFY_KEY = "breminder_bt_timeout_notify";
+    // Usamos a constante da MainActivity para garantir consistência na chave
+    private static final String SETTING_BLUETOOTH_TIMEOUT_NOTIFY = MainActivity.SETTING_BLUETOOTH_TIMEOUT_NOTIFY;
+    
+    // Chaves locais (SharedPreferences)
     private static final String WIFI_SAFE_ZONE_PREFS_KEY = "WifiSafeZonePrefs";
     private static final String WIFI_SAFE_ZONE_LIST_KEY = "WifiSafeZoneList";
     private static final String WIFI_SAFE_ZONE_SWITCH_STATE_KEY = "WifiSafeZoneSwitchState";
@@ -42,6 +45,7 @@ public class WifiMonitorService extends Service {
 
         loadWifiSafeZoneList();
 
+        // Registra o receiver para mudanças de conectividade (troca de wifi, desconexão, etc)
         wifiReceiver = new WifiStateReceiver();
         IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
         registerReceiver(wifiReceiver, filter);
@@ -49,6 +53,7 @@ public class WifiMonitorService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Sempre que o serviço é iniciado (ou reiniciado pelo toggle), verificamos o estado atual
         loadWifiSafeZoneList();
         checkWifiAndToggleBluetoothTimeout();
         return START_STICKY;
@@ -57,7 +62,9 @@ public class WifiMonitorService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(wifiReceiver);
+        if (wifiReceiver != null) {
+            unregisterReceiver(wifiReceiver);
+        }
         Log.d(TAG, "Service Destroyed. Monitoring stopped.");
     }
 
@@ -66,11 +73,15 @@ public class WifiMonitorService extends Service {
         return null;
     }
 
+    /**
+     * Receiver que ouve mudanças na rede e agenda uma verificação.
+     */
     private class WifiStateReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (ConnectivityManager.CONNECTIVITY_ACTION.equals(intent.getAction())) {
-                new Handler(Looper.getMainLooper()).postDelayed(WifiMonitorService.this::checkWifiAndToggleBluetoothTimeout, 1000);
+                // Delay pequeno para garantir que a conexão Wifi estabilizou e o SSID está disponível
+                new Handler(Looper.getMainLooper()).postDelayed(WifiMonitorService.this::checkWifiAndToggleBluetoothTimeout, 2000);
             }
         }
     }
@@ -88,24 +99,36 @@ public class WifiMonitorService extends Service {
         wifiSafeZoneList.addAll(safeZoneSet);
     }
 
+    /**
+     * Lógica principal:
+     * 1. Pega o Wifi atual.
+     * 2. Verifica se está na lista segura.
+     * 3. Ativa ou Desativa a notificação de Bluetooth baseado nisso.
+     */
     private void checkWifiAndToggleBluetoothTimeout() {
         if (!isWifiSafeZoneEnabled()) {
+            Log.d(TAG, "Zona segura desativada. Ignorando verificação.");
             return;
         }
 
-        boolean btMonitoringEnabled = Settings.Global.getInt(getContentResolver(), BLUETOOTH_MONITORING_NOTIFY_KEY, 1) == 1;
+        String currentSsid = getConnectedWifiName();
+        loadWifiSafeZoneList(); // Recarrega para garantir lista atualizada
 
-        if (btMonitoringEnabled) {
-            String currentSsid = getConnectedWifiName();
-            loadWifiSafeZoneList();
+        // LÓGICA:
+        // Se estivermos conectados a um Wifi SEGURO -> DESATIVAR notificação (false)
+        // Se estivermos desconectados ou em Wifi NÃO SEGURO -> ATIVAR notificação (true)
+        
+        boolean isConnectedToSafeZone = currentSsid != null && wifiSafeZoneList.contains(currentSsid);
+        boolean shouldEnableBluetoothNotify = !isConnectedToSafeZone;
 
-            saveBluetoothMonitoringSettings(currentSsid != null && !wifiSafeZoneList.contains(currentSsid));
-        }
+        Log.d(TAG, "Wifi Atual: " + currentSsid + " | Na Zona Segura: " + isConnectedToSafeZone + " | Definindo Bluetooth Notify para: " + shouldEnableBluetoothNotify);
 
+        saveBluetoothMonitoringSettings(shouldEnableBluetoothNotify);
     }
 
     private String getConnectedWifiName() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Sem permissão de localização para ler SSID.");
             return null;
         }
 
@@ -121,6 +144,7 @@ public class WifiMonitorService extends Service {
                         WifiInfo wifiInfo = wifiManager.getConnectionInfo();
                         String ssid = wifiInfo.getSSID();
 
+                        // Remove aspas do SSID se existirem (comportamento padrão do Android)
                         if (ssid != null && ssid.startsWith("\"") && ssid.endsWith("\"")) {
                             ssid = ssid.substring(1, ssid.length() - 1);
                         }
@@ -138,9 +162,14 @@ public class WifiMonitorService extends Service {
     private void saveBluetoothMonitoringSettings(boolean isEnabled) {
         int value = isEnabled ? 1 : 0;
         try {
-            Settings.Global.putInt(getContentResolver(),
-                    BLUETOOTH_MONITORING_NOTIFY_KEY, value);
-            Log.d(TAG, "Configuração do Monitoramento bluetooth salva: " + value);
+            // Verifica o estado atual para não escrever no banco de dados sem necessidade
+            int current = Settings.Global.getInt(getContentResolver(), SETTING_BLUETOOTH_TIMEOUT_NOTIFY, -1);
+            
+            if (current != value) {
+                Settings.Global.putInt(getContentResolver(),
+                        SETTING_BLUETOOTH_TIMEOUT_NOTIFY, value);
+                Log.d(TAG, "Configuração do Monitoramento bluetooth atualizada para: " + value);
+            }
         } catch (SecurityException e) {
             Log.e(TAG, "Falha ao salvar configuração do Monitoramento bluetooth.", e);
         }

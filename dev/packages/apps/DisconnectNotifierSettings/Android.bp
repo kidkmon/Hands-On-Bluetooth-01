@@ -1,30 +1,41 @@
-//
-// Build file para o App de Configuracoes do Notificador de Desconexao
-//
 android_app {
     name: "DisconnectNotifierSettings",
     
-    // Caminho para os arquivos-fonte Java
     srcs: ["src/**/*.java"],
-
-    // Caminho para os recursos (layouts, strings)
     resource_dirs: ["res"],
 
-    // Pacote do aplicativo
     package_name: "com.android.breminder.settings",
 
-    // Bibliotecas estaticas necessarias (para AppCompat e Material Design)
     static_libs: [
         "androidx.appcompat_appcompat",
         "com.google.android.material_material",
     ],
 
     platform_apis: true,
-
-    // Marca o app como um "priv-app"
     privileged: true,
+    
+    certificate: "platform",
+
+    required: [
+        "privapp-permissions-breminder.xml",
+        "default-permissions-breminder.xml",
+    ],
 
     optimize: {
         enabled: true,
     },
+}
+
+prebuilt_etc {
+    name: "privapp-permissions-breminder.xml",
+    src: "privapp-permissions-breminder.xml",
+    sub_dir: "permissions",
+    filename_from_src: true,
+}
+
+prebuilt_etc {
+    name: "default-permissions-breminder.xml",
+    src: "default-permissions-breminder.xml",
+    sub_dir: "default-permissions",
+    filename_from_src: true,
 }
