@@ -37,6 +37,11 @@ import static com.android.bluetooth.Utils.isPackageNameAccurate;
 
 import static java.util.Objects.requireNonNull;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.SystemProperties;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
@@ -249,6 +254,13 @@ public class AdapterService extends Service {
     static final String SIM_ACCESS_PERMISSION_PREFERENCE_FILE = "sim_access_permission";
 
     private static final int CONTROLLER_ENERGY_UPDATE_TIMEOUT_MILLIS = 30;
+
+    // Adicione uma nova constante para o ID desta notificação
+    private static final int DISCONNECT_NOTIFY_ID_WARNING = 44;
+
+    private static final String PROP_DISCONNECT_NOTIFY_ENABLED = "persist.bluetooth.disconnect_notify.enabled";
+    private static final String DISCONNECT_NOTIFY_CHANNEL_ID = "bluetooth_disconnect_timeout";
+    private NotificationManager mShakkaNotificationManager;
 
     // Report ID definition
     public enum BqrQualityReportId {
@@ -753,6 +765,8 @@ public class AdapterService extends Service {
             Log.w(TAG, "Unable to resolve SystemUI's UID.", e);
         }
 
+        mShakkaNotificationManager = getSystemService(NotificationManager.class);
+        
         Log.i(TAG, "SHAKKA_LOG: AdapterService.onCreate() - PRESTES A INICIAR DisconnectNotificationService com Ação...");
         // Usa a action para iniciar o servico
         Intent intent = new Intent(DisconnectNotificationService.ACTION_START_MONITORING);
@@ -766,6 +780,43 @@ public class AdapterService extends Service {
     public IBinder onBind(Intent intent) {
         debugLog("onBind()");
         return mBinder;
+    }
+
+    // ***** NOVO MÉTODO  *****
+    public void handleRssiAlert(byte[] address, int rssiThreshold) {
+        Log.i(TAG, "SHAKKA_LOG: handleRssiAlert - Usuário se distanciando!");
+
+        if (!SystemProperties.getBoolean(PROP_DISCONNECT_NOTIFY_ENABLED, false)) {
+            return;
+        }
+
+        BluetoothDevice device = getDeviceFromByte(address);
+        if (device == null) return;
+
+        sendRssiWarningNotification(device);
+    }
+
+    private void sendRssiWarningNotification(BluetoothDevice device) {
+        if (mShakkaNotificationManager == null) return;
+
+        String deviceName = device.getName();
+        if (deviceName == null || deviceName.isEmpty()) deviceName = device.getAddress();
+
+        String title = "Alerta de Distância Bluetooth";
+        String content = "Cuidado! Você está se afastando de '" + deviceName + "'.";
+
+        int icon = android.R.drawable.stat_sys_warning; // Ícone de alerta (triângulo amarelo)
+
+        Notification notification = new Notification.Builder(this, DISCONNECT_NOTIFY_CHANNEL_ID)
+                .setSmallIcon(icon)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(false) // Alertar sempre que o estado mudar
+                .build();
+
+        mShakkaNotificationManager.notify(DISCONNECT_NOTIFY_ID_WARNING, notification);
+        Log.i(TAG, "SHAKKA_LOG: Notificação de DISTÂNCIA enviada.");
     }
 
     @Override

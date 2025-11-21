@@ -186,6 +186,10 @@ struct tACL_CONN {
   alarm_t* rssi_poll_timer;
   int8_t   last_known_rssi;
   tHCI_REASON last_disconnect_reason;
+
+  // adicao para alerta de distanciamento
+  bool low_signal_alert_sent;
+
   // ===========================================
   RawAddress active_remote_addr;
   tBLE_ADDR_TYPE active_remote_addr_type;

@@ -83,7 +83,7 @@
 #include "stack/include/main_thread.h"
 #include "types/hci_role.h"
 #include "types/raw_address.h"
-// ========================
+// ================ SHAKKA ===========
 #include "osi/include/alarm.h"
 #include "btif/include/btif_dm.h"
 #include "btif/include/btif_api.h"
@@ -458,6 +458,34 @@ static void btm_acl_rssi_result_cb(void* p_data) {
     if (p_acl != nullptr && p_acl->in_use) {
         p_acl->last_known_rssi = rssi;
         LOG_INFO("SHAKKA_LOG: RSSI (via BTM CB) para %s: %d", bda.ToString().c_str(), rssi);
+
+
+        // ***** LOGICA DE ALERTA DE DISTANCIA*****
+        // Limiar definido: -35 dBm
+        // precisa calibrar
+        // Mas vamos usar -35 para facilitar o teste
+        const int8_t RSSI_THRESHOLD_WARNING = -35; 
+        const int8_t RSSI_HYSTERESIS_RESET  = -15; // Precisa melhorar para -15 para resetar
+
+        if (rssi <= RSSI_THRESHOLD_WARNING) {
+            // Sinal esta fraco (ou a pessoa se afastou)
+            if (!p_acl->low_signal_alert_sent) {
+                LOG_INFO("SHAKKA_LOG: Sinal abaixo de %d! Enviando alerta para Java.", RSSI_THRESHOLD_WARNING);
+                
+                // Chama a nossa ponte
+                btif_dm_report_rssi_alert(bda);
+                
+                // Marca como enviado para nao spammar notificacoes
+                p_acl->low_signal_alert_sent = true;
+            }
+        } 
+        else if (rssi >= RSSI_HYSTERESIS_RESET) {
+            // Sinal voltou a ficar forte (pessoa voltou)
+            if (p_acl->low_signal_alert_sent) {
+                LOG_INFO("SHAKKA_LOG: Sinal recuperado. Resetando alerta.");
+                p_acl->low_signal_alert_sent = false;
+            }
+        }
     } else {
          LOG_WARN("SHAKKA_LOG: Callback RSSI BTM recebido para ACL não encontrada/inativa: %s",
                  bda.ToString().c_str());

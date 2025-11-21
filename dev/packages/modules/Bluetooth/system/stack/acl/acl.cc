@@ -22,6 +22,7 @@ void tACL_CONN::Reset() {
   last_known_rssi = -127; // shakka
   rssi_poll_timer = nullptr; // shakka
   last_disconnect_reason = HCI_SUCCESS; // shakka
+  low_signal_alert_sent = false; // shakka
   memset(peer_le_features, 0, sizeof(peer_le_features));
   peer_le_features_valid = false;
   memset(peer_lmp_feature_pages, 0, sizeof(peer_lmp_feature_pages));

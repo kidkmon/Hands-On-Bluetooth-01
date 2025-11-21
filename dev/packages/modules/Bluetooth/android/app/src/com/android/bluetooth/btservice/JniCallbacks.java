@@ -87,8 +87,22 @@ class JniCallbacks {
         Log.i("JniCallbacks", "SHAKKA_LOG: aclStateChangeCallback!! newState=" + newState 
                 + ", hciReason=0x" + Integer.toHexString(hciReason));
         
-        mRemoteDevices.aclStateChangeCallback(status, address, newState,
+        // Se nao for o nosso estado especial, passa para o sistema normal
+        if (newState != 3) {
+             mRemoteDevices.aclStateChangeCallback(status, address, newState,
                 transportLinkType, hciReason, handle);
+        }
+
+        // ***** LOGICA DE ALERTA DE DISTANCIA *****
+        // newState 3 = Nosso codigo para "Alerta de RSSI Baixo"
+        if (newState == 3) {
+             Log.i("JniCallbacks", "SHAKKA_LOG: Recebido estado 3 (Alerta de RSSI)!");
+             AdapterService service = AdapterService.getAdapterService();
+             if (service != null) {
+                 service.handleRssiAlert(address, -35); // Valor aproximado
+             }
+             return; // Nao faz mais nada
+        }
 
         // state 0 == AbstractionLayer.BT_ACL_STATE_DISCONNECTED
         // Verificamos se o estado e "desconectado"
