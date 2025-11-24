@@ -5,9 +5,32 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
+    android:background="@color/light_pink_background"
     tools:context=".MainActivity">
 
+    <!-- 1. HEADER (Sem alterações) -->
+    <FrameLayout
+        android:id="@+id/header_bar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/header_blue"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="B-Reminder"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </FrameLayout>
+
+    <!-- 2. SEÇÃO DE MONITORAMENTO (Sem alterações) -->
     <TextView
+<<<<<<< Updated upstream
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginBottom="24dp"
@@ -37,8 +60,60 @@
         android:layout_marginBottom="8dp"
         android:text="@string/toggle_safe_zone_title"
         android:textSize="16sp" />
+=======
+        android:id="@+id/textViewMonitoramentoBluetooth"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="8dp"
+        android:text="Monitoramento Inteligente"
+        android:textSize="16sp"
+        android:textColor="@android:color/black"
+        app:layout_constraintEnd_toStartOf="@+id/switchBluetooth"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/header_bar" />
 
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switchBluetooth"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintBottom_toBottomOf="@id/textViewMonitoramentoBluetooth"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/textViewMonitoramentoBluetooth" />
+
+    <!-- 3. SEÇÃO DE WI-FI (Sem alterações) -->
     <TextView
+        android:id="@+id/textView2"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="24dp"
+        android:layout_marginEnd="8dp"
+        android:text="Wi-Fi Seguro"
+        android:textSize="16sp"
+        android:textColor="@android:color/black"
+        app:layout_constraintEnd_toStartOf="@+id/switchWifi"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textViewMonitoramentoBluetooth" />
+>>>>>>> Stashed changes
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switchWifi"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        app:layout_constraintBottom_toBottomOf="@id/textView2"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/textView2" />
+
+    <!--
+      MUDANÇA 1: MENSAGEM DE STATUS DE VOLTA AO CENTRO
+      Amarrada aos 4 lados do 'parent' para centralização total.
+    -->
+    <TextView
+<<<<<<< Updated upstream
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="16dp"
@@ -62,3 +137,32 @@
         android:padding="8dp" />
 
 </LinearLayout>
+        android:id="@+id/status_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Status Bluetooth: Conectado (Aguardando eventos)"
+        android:textColor="@android:color/black"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!--
+      MUDANÇA 2: LISTA (RecyclerView) ABAIXO DA MENSAGEM DE STATUS
+      Ela começa abaixo da mensagem de status e preenche o restante
+      do espaço até a parte inferior (com margens).
+    -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/wifi_recycler_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/status_message" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
