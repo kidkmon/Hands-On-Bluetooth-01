@@ -41,7 +41,7 @@ import org.json.JSONException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity1 extends AppCompatActivity {
 
     private static final String TAG = "BluetoothBroadcast";
     // Código de requisição para múltiplas permissões
@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
     public static final String KEY_MONITORAMENTO_ENABLED = "key_monitoring_enabled";
     public static final String KEY_WIFI_LIST_JSON = "key_wifi_list_json";
 
-    private BluetoothTimeoutReceiver bluetoothTimeoutReceiver;
+    //private BluetoothTimeoutReceiver bluetoothTimeoutReceiver;
     private TextView statusTextView;
     private BroadcastReceiver timeoutMessageReceiver;
 
@@ -64,17 +64,17 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main1);
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
+//        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.textView2), (v, insets) -> {
+//            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+//            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+//            return insets;
+//        });
 
         setupLocalTimeoutReceiver();
 
-        bluetoothTimeoutReceiver = new BluetoothTimeoutReceiver();
+        //bluetoothTimeoutReceiver = new BluetoothTimeoutReceiver();
 
         // Verifica TODAS as permissões necessárias (BT + Localização) ao iniciar
         checkAndRequestAllPermissions();
@@ -96,7 +96,7 @@ public class MainActivity extends AppCompatActivity {
 
         // --- INÍCIO DA LÓGICA WI-FI ---
 
-        SwitchMaterial switchWifi = findViewById(R.id.switchWifi);
+        SwitchMaterial switchWifi = findViewById(R.id.wifiSafeZoneSwitch);
         wifiRecyclerView = findViewById(R.id.wifi_recycler_view);
 
         // Carrega a lista salva anteriormente (JSON)
@@ -126,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
                         Log.d(TAG, "Rede adicionada: " + realWifiName);
                     } else {
                         // Caso não esteja conectado ou sem permissão
-                        Toast.makeText(MainActivity.this, "Nenhuma rede Wi-Fi detectada ou sem permissão.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity1.this, "Nenhuma rede Wi-Fi detectada ou sem permissão.", Toast.LENGTH_SHORT).show();
                         // Desliga o switch visualmente para indicar falha
                         buttonView.setChecked(false);
                     }
@@ -259,13 +259,13 @@ public class MainActivity extends AppCompatActivity {
         timeoutMessageReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                if (BluetoothTimeoutReceiver.ACTION_BLUETOOTH_TIMEOUT.equals(intent.getAction())) {
-                    String deviceName = intent.getStringExtra(BluetoothTimeoutReceiver.EXTRA_DEVICE_NAME);
-                    String message = deviceName + " se desconectou por distância! (Timeout)";
-                    if (statusTextView != null) {
-                        statusTextView.setText(message);
-                    }
-                }
+//                if (BluetoothTimeoutReceiver.ACTION_BLUETOOTH_TIMEOUT.equals(intent.getAction())) {
+//                    String deviceName = intent.getStringExtra(BluetoothTimeoutReceiver.EXTRA_DEVICE_NAME);
+//                    String message = deviceName + " se desconectou por distância! (Timeout)";
+//                    if (statusTextView != null) {
+//                        statusTextView.setText(message);
+//                    }
+//                }
             }
         };
     }
@@ -273,26 +273,26 @@ public class MainActivity extends AppCompatActivity {
     private void registerBluetoothReceiver() {
         IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
         try {
-            registerReceiver(bluetoothTimeoutReceiver, filter);
+            //registerReceiver(bluetoothTimeoutReceiver, filter);
         } catch (SecurityException e) {
             Log.e(TAG, "ERRO: Falha ao registrar o Receiver.", e);
         }
     }
 
     private void unregisterBluetoothReceiver() {
-        if (bluetoothTimeoutReceiver != null) {
-            try {
-                unregisterReceiver(bluetoothTimeoutReceiver);
-            } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Receiver já foi desregistrado.");
-            }
-        }
+//        if (bluetoothTimeoutReceiver != null) {
+//            try {
+//                unregisterReceiver(bluetoothTimeoutReceiver);
+//            } catch (IllegalArgumentException e) {
+//                Log.w(TAG, "Receiver já foi desregistrado.");
+//            }
+//        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(timeoutMessageReceiver, new IntentFilter(BluetoothTimeoutReceiver.ACTION_BLUETOOTH_TIMEOUT));
+        //LocalBroadcastManager.getInstance(this).registerReceiver(timeoutMessageReceiver, new IntentFilter(BluetoothTimeoutReceiver.ACTION_BLUETOOTH_TIMEOUT));
     }
 
     @Override
